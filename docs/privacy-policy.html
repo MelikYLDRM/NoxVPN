@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nox VPN - Privacy Policy</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a1a;
+      color: #e0e0e0;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #00e5cc;
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      color: #00e5cc;
+      font-size: 1.3rem;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    p,
+    li {
+      margin-bottom: 12px;
+      color: #c0c0c0;
+    }
+
+    ul {
+      padding-left: 24px;
+    }
+
+    .date {
+      color: #808080;
+      font-size: 0.9rem;
+      margin-bottom: 32px;
+    }
+
+    a {
+      color: #00e5cc;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Nox VPN - Privacy Policy</h1>
+    <p class="date">Last updated: March 21, 2026</p>
+
+    <h2>1. Introduction</h2>
+    <p>Nox VPN ("we", "our", "the app") is a free VPN application that uses the WireGuard protocol to provide secure
+      internet connectivity. We are committed to protecting your privacy.</p>
+
+    <h2>2. Data We Collect</h2>
+    <p>Nox VPN collects <strong>minimal data</strong> necessary for VPN functionality:</p>
+    <ul>
+      <li><strong>WireGuard Key Pair:</strong> A public/private key pair is generated locally on your device. The
+        private key never leaves your device. The public key is sent to Cloudflare WARP API during initial registration
+        only.</li>
+      <li><strong>Device Type:</strong> Basic device information (e.g., "Android") is sent during WARP registration to
+        obtain VPN configuration.</li>
+    </ul>
+
+    <h2>3. Data We Do NOT Collect</h2>
+    <ul>
+      <li>We do <strong>not</strong> log your browsing activity or traffic.</li>
+      <li>We do <strong>not</strong> collect your IP address, DNS queries, or connection timestamps.</li>
+      <li>We do <strong>not</strong> collect personal information such as name, email, or phone number.</li>
+      <li>We do <strong>not</strong> use analytics, tracking, or advertising SDKs.</li>
+      <li>We do <strong>not</strong> share any data with third parties.</li>
+    </ul>
+
+    <h2>4. Third-Party Services</h2>
+    <p>The app uses <strong>Cloudflare WARP</strong> infrastructure for VPN connectivity. When you use the VPN, your
+      internet traffic is routed through Cloudflare's network. Cloudflare's own privacy policy governs how they handle
+      network traffic. You can review it at <a href="https://www.cloudflare.com/privacypolicy/"
+        target="_blank">cloudflare.com/privacypolicy</a>.</p>
+
+    <h2>5. Data Storage</h2>
+    <p>All configuration data (VPN keys, server settings, user preferences) is stored <strong>locally on your
+        device</strong> using Android's SharedPreferences. No data is stored on external servers by us.</p>
+
+    <h2>6. Data Security</h2>
+    <p>VPN connections are encrypted using the WireGuard protocol, which employs state-of-the-art cryptography including
+      Curve25519 for key exchange, ChaCha20 for encryption, and Poly1305 for authentication.</p>
+
+    <h2>7. Children's Privacy</h2>
+    <p>Nox VPN is not directed at children under 13. We do not knowingly collect data from children.</p>
+
+    <h2>8. Changes to This Policy</h2>
+    <p>We may update this privacy policy from time to time. Any changes will be reflected on this page with an updated
+      date.</p>
+
+    <h2>9. Contact</h2>
+    <p>If you have questions about this privacy policy, you can reach us by opening an issue on our GitHub repository or
+      contacting us at the email provided on our Google Play listing.</p>
+  </div>
+</body>
+
+</html>
