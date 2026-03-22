@@ -20,8 +20,9 @@
     native <methods>;
 }
 
-# Google Play Core (referenced by Flutter deferred components)
+# Google Play Core (in-app updates & deferred components)
 -dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
 
 # javax.annotation (referenced by WireGuard NonNullForAll)
 -dontwarn javax.annotation.**

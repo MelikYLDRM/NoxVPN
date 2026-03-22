@@ -3,6 +3,7 @@ package com.melikyldrm.noxvpn.vpn
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.util.Log
 import com.wireguard.config.Config
 import com.wireguard.config.InetNetwork
@@ -105,7 +106,11 @@ class WireGuardChannel(
 
             val serviceIntent = Intent(activity, MyVpnService::class.java)
             serviceIntent.action = MyVpnService.ACTION_CONNECT
-            activity.startService(serviceIntent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                activity.startForegroundService(serviceIntent)
+            } else {
+                activity.startService(serviceIntent)
+            }
 
             result.success(true)
         } catch (e: Exception) {
@@ -118,7 +123,11 @@ class WireGuardChannel(
         try {
             val serviceIntent = Intent(activity, MyVpnService::class.java)
             serviceIntent.action = MyVpnService.ACTION_DISCONNECT
-            activity.startService(serviceIntent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                activity.startForegroundService(serviceIntent)
+            } else {
+                activity.startService(serviceIntent)
+            }
             result.success(true)
         } catch (e: Exception) {
             result.error("DISCONNECT_ERROR", e.message, null)

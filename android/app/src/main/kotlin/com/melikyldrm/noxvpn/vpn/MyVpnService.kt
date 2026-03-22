@@ -9,6 +9,7 @@ import android.net.VpnService
 import android.os.Build
 import android.util.Log
 import com.melikyldrm.noxvpn.MainActivity
+import com.melikyldrm.noxvpn.R
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import java.util.Timer
@@ -40,7 +41,7 @@ class MyVpnService : VpnService() {
             ACTION_CONNECT -> connect()
             ACTION_DISCONNECT -> disconnect()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun connect() {
@@ -117,6 +118,11 @@ class MyVpnService : VpnService() {
         statsTimer = null
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        disconnect()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onRevoke() {
         disconnect()
         super.onRevoke()
@@ -159,7 +165,7 @@ class MyVpnService : VpnService() {
         return builder
             .setContentTitle("Nox VPN")
             .setContentText(status)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setSmallIcon(R.drawable.ic_stat_vpn)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()

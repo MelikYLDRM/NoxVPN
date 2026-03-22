@@ -41,11 +41,6 @@ class ProfileScreen extends StatelessWidget {
               height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppColors.neonTurquoise, AppColors.electricBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.neonTurquoise.withValues(alpha: 0.3),
@@ -54,10 +49,13 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.shield_rounded,
-                size: 50,
-                color: Colors.white,
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/noxlogo.png',
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           ),
