@@ -14,6 +14,7 @@ object TunnelManager {
     var config: Config? = null
     var status: TunnelStatus = TunnelStatus.disconnected
     var killSwitchEnabled: Boolean = false
+    var excludedApps: List<String> = emptyList()
 
     private var lastDownloadBytes: Long = 0
     private var lastUploadBytes: Long = 0
@@ -53,5 +54,6 @@ object TunnelManager {
         lastUploadBytes = 0
         prevDownloadBytes = 0
         prevUploadBytes = 0
+        excludedApps = emptyList()
     }
 }

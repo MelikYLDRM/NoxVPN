@@ -39,10 +39,17 @@ final vpnStateProvider = StateNotifierProvider<VpnNotifier, VpnState>((ref) {
 
 class VpnNotifier extends StateNotifier<VpnState> {
   final Ref _ref;
+  int _retryCount = 0;
+  static const int _maxRetries = 3;
 
   VpnNotifier(this._ref) : super(VpnState.disconnected());
 
   Future<void> connect(ServerConfig server) async {
+    _retryCount = 0;
+    await _connectInternal(server);
+  }
+
+  Future<void> _connectInternal(ServerConfig server) async {
     state = state.copyWith(
       status: VpnConnectionStatus.requestingPermission,
       activeServer: server,
@@ -55,7 +62,7 @@ class VpnNotifier extends StateNotifier<VpnState> {
     if (!permitted) {
       state = state.copyWith(
         status: VpnConnectionStatus.error,
-        errorMessage: 'VPN permission denied',
+        errorMessage: '@vpnPermissionDenied',
       );
       return;
     }
@@ -63,7 +70,6 @@ class VpnNotifier extends StateNotifier<VpnState> {
     state = state.copyWith(status: VpnConnectionStatus.connecting);
 
     try {
-      // Use private key from imported config if available, otherwise generate
       String privateKey;
       if (server.hasPrivateKey) {
         privateKey = server.clientPrivateKey!;
@@ -74,7 +80,6 @@ class VpnNotifier extends StateNotifier<VpnState> {
 
       final settings = _ref.read(settingsProvider);
 
-      // Apply DNS from settings to server config
       final serverWithDns = server.copyWith(
         dnsServers: settings.activeDnsServers,
       );
@@ -82,11 +87,11 @@ class VpnNotifier extends StateNotifier<VpnState> {
       final success = await engine.connect(
         serverWithDns,
         clientPrivateKey: privateKey,
+        killSwitch: settings.killSwitchEnabled,
+        excludedApps: settings.excludedApps,
       );
 
       if (success) {
-        // The native side starts the service asynchronously.
-        // Poll the real tunnel status for up to 15 seconds.
         var tunnelUp = false;
         for (int i = 0; i < 30; i++) {
           await Future.delayed(const Duration(milliseconds: 500));
@@ -102,26 +107,36 @@ class VpnNotifier extends StateNotifier<VpnState> {
         }
 
         if (tunnelUp) {
+          _retryCount = 0;
           state = state.copyWith(
             status: VpnConnectionStatus.connected,
             connectedSince: DateTime.now(),
           );
         } else {
-          state = state.copyWith(
-            status: VpnConnectionStatus.error,
-            errorMessage: 'Tunnel failed to establish',
-          );
+          await _retryOrFail(server, '@tunnelFailed');
         }
       } else {
-        state = state.copyWith(
-          status: VpnConnectionStatus.error,
-          errorMessage: 'Connection failed',
-        );
+        await _retryOrFail(server, '@connectionFailed');
       }
     } catch (e) {
       state = state.copyWith(
         status: VpnConnectionStatus.error,
         errorMessage: e.toString(),
+      );
+    }
+  }
+
+  Future<void> _retryOrFail(ServerConfig server, String errorKey) async {
+    if (_retryCount < _maxRetries) {
+      _retryCount++;
+      await Future.delayed(Duration(seconds: _retryCount * 2));
+      if (mounted) {
+        await _connectInternal(server);
+      }
+    } else {
+      state = state.copyWith(
+        status: VpnConnectionStatus.error,
+        errorMessage: '$errorKey:$_maxRetries',
       );
     }
   }
@@ -141,6 +156,11 @@ final connectionStatsProvider = StreamProvider<ConnectionStats>((ref) async* {
   final engine = ref.read(vpnEngineProvider);
   while (true) {
     await Future.delayed(AppConstants.statsPollingInterval);
+
+    // Check connection is still active before yielding
+    final currentState = ref.read(vpnStateProvider);
+    if (currentState.status != VpnConnectionStatus.connected) return;
+
     final stats = await engine.getStatistics();
     if (stats != null) {
       yield stats;

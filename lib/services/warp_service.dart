@@ -184,7 +184,7 @@ class WarpService {
       clientAddress: reg.clientIpv4,
       allowedIPs: const ['0.0.0.0/0', '::/0'],
       dnsServers: const ['1.1.1.1', '1.0.0.1'],
-      mtu: 1280,
+      mtu: 1400,
       persistentKeepalive: 25,
       estimatedPingMs: 15,
     );

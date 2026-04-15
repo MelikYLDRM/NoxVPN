@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -8,28 +12,24 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+
     return SafeArea(
       child: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
         children: [
-          const SizedBox(height: 16),
-          const Row(
+          const SizedBox(height: AppSpacing.lg),
+          Row(
             children: [
-              Icon(
-                Icons.person_outline,
+              const Icon(
+                Icons.person_rounded,
                 color: AppColors.neonTurquoise,
                 size: 28,
               ),
-              SizedBox(width: 12),
-              Text(
-                'About',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(l.navAbout, style: theme.textTheme.titleLarge),
             ],
           ),
           const SizedBox(height: 40),
@@ -59,89 +59,164 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          const Center(
+          const SizedBox(height: AppSpacing.xl),
+          Center(
             child: Text(
-              AppConstants.appName,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              l.appName,
+              style: theme.textTheme.displayLarge,
             ),
           ),
           Center(
-            child: Text(
-              'Version ${AppConstants.appVersion}',
-              style: TextStyle(color: Colors.grey[500], fontSize: 14),
+            child: Container(
+              margin: const EdgeInsets.only(top: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: AppColors.neonTurquoise.withValues(alpha: 0.1),
+              ),
+              child: Text(
+                'v${AppConstants.appVersion}',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppColors.neonTurquoise,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: AppSpacing.xxxl),
 
-          // Info cards
-          _buildInfoCard(
-            icon: Icons.lock_outline,
-            title: 'WireGuard Protocol',
-            description:
-                'WireGuard is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography.',
+          // Feature chips
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildFeatureChip(context, Icons.lock_rounded, l.wireguard),
+              _buildFeatureChip(context, Icons.speed_rounded, l.fast),
+              _buildFeatureChip(
+                context,
+                Icons.visibility_off_rounded,
+                l.noLogs,
+              ),
+              _buildFeatureChip(context, Icons.security_rounded, l.encrypted),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.xxxl),
+
           _buildInfoCard(
+            context,
+            icon: Icons.lock_outline_rounded,
+            title: l.wireguardProtocol,
+            description: l.wireguardProtocolDesc,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildInfoCard(
+            context,
             icon: Icons.speed_rounded,
-            title: 'Fast & Lightweight',
-            description:
-                'WireGuard runs with minimal overhead, making it one of the fastest VPN protocols available.',
+            title: l.fastLightweight,
+            description: l.fastLightweightDesc,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
           _buildInfoCard(
+            context,
             icon: Icons.security_rounded,
-            title: 'Modern Cryptography',
-            description:
-                'Uses Curve25519, ChaCha20, Poly1305, BLAKE2s, and SipHash24 for maximum security.',
+            title: l.modernCrypto,
+            description: l.modernCryptoDesc,
           ),
-          const SizedBox(height: 100),
+          const SizedBox(height: AppSpacing.xxl),
+
+          _buildLinkCard(
+            context,
+            icon: Icons.privacy_tip_outlined,
+            title: l.privacyPolicy,
+            color: AppColors.electricBlue,
+            onTap: () => _launchUrl(
+              'https://melikyldrm.github.io/NoxVPN/privacy-policy.html',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildLinkCard(
+            context,
+            icon: Icons.email_outlined,
+            title: l.contactUs,
+            subtitle: 'melikyildirim2006@gmail.com',
+            color: AppColors.warningOrange,
+            onTap: () => _launchUrl('mailto:melikyildirim2006@gmail.com'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _buildLinkCard(
+            context,
+            icon: Icons.code_rounded,
+            title: l.github,
+            subtitle: 'MelikYLDRM/NoxVPN',
+            color: AppColors.successGreen,
+            onTap: () => _launchUrl('https://github.com/MelikYLDRM/NoxVPN'),
+          ),
+          SizedBox(height: AppSpacing.bottomNavHeight + AppSpacing.xl),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard({
+  Widget _buildFeatureChip(BuildContext context, IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.cardBg,
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.neonTurquoise, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String description,
   }) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white.withValues(alpha: 0.05),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        borderRadius: BorderRadius.circular(18),
+        color: AppColors.cardBg,
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.neonTurquoise, size: 24),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.neonTurquoise.withValues(alpha: 0.1),
+            ),
+            child: Icon(icon, color: AppColors.neonTurquoise, size: 22),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text(title, style: theme.textTheme.titleSmall),
                 const SizedBox(height: 6),
                 Text(
                   description,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                 ),
               ],
             ),
@@ -149,5 +224,74 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildLinkCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: 14,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: AppColors.cardBg,
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.12),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.bodyLarge),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: theme.textTheme.bodySmall),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 }

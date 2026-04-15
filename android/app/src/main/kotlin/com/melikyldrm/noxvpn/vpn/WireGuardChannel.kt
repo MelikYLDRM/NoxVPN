@@ -2,6 +2,7 @@ package com.melikyldrm.noxvpn.vpn
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
@@ -39,6 +40,7 @@ class WireGuardChannel(
             "getStatus" -> getStatus(result)
             "getStatistics" -> getStatistics(result)
             "generateKeyPair" -> generateKeyPair(result)
+            "getInstalledApps" -> getInstalledApps(result)
             else -> result.notImplemented()
         }
     }
@@ -72,6 +74,7 @@ class WireGuardChannel(
             val presharedKey = call.argument<String>("presharedKey")
             val persistentKeepalive = call.argument<Int>("persistentKeepalive") ?: 25
             val killSwitch = call.argument<Boolean>("killSwitch") ?: false
+            val excludedApps = call.argument<List<String>>("excludedApps") ?: emptyList()
 
             // Build WireGuard Config
             val interfaceBuilder = Interface.Builder()
@@ -83,6 +86,17 @@ class WireGuardChannel(
                 interfaceBuilder.parseDnsServers(d.trim())
             }
             interfaceBuilder.parseMtu(mtu.toString())
+
+            // Apply split tunneling — exclude specified apps from VPN
+            if (excludedApps.isNotEmpty()) {
+                for (app in excludedApps) {
+                    try {
+                        interfaceBuilder.excludeApplication(app)
+                    } catch (e: Exception) {
+                        Log.w("WireGuardChannel", "Could not exclude app: $app")
+                    }
+                }
+            }
 
             val peerBuilder = Peer.Builder()
             peerBuilder.parsePublicKey(publicKey)
@@ -103,6 +117,7 @@ class WireGuardChannel(
             // Store config in TunnelManager and start service
             TunnelManager.config = config
             TunnelManager.killSwitchEnabled = killSwitch
+            TunnelManager.excludedApps = excludedApps
 
             val serviceIntent = Intent(activity, MyVpnService::class.java)
             serviceIntent.action = MyVpnService.ACTION_CONNECT
@@ -158,6 +173,26 @@ class WireGuardChannel(
             )
         } catch (e: Exception) {
             result.error("KEY_GEN_ERROR", e.message, null)
+        }
+    }
+
+    private fun getInstalledApps(result: MethodChannel.Result) {
+        try {
+            val pm = activity.packageManager
+            val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            val apps = mutableListOf<Map<String, String>>()
+            for (appInfo in packages) {
+                if (pm.getLaunchIntentForPackage(appInfo.packageName) == null) continue
+                if (appInfo.packageName == activity.packageName) continue
+                apps.add(mapOf(
+                    "packageName" to appInfo.packageName,
+                    "appName" to pm.getApplicationLabel(appInfo).toString()
+                ))
+            }
+            apps.sortBy { (it["appName"] ?: "").lowercase() }
+            result.success(apps)
+        } catch (e: Exception) {
+            result.error("APPS_ERROR", e.message, null)
         }
     }
 }

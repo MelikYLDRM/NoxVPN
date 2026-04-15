@@ -22,6 +22,8 @@ class MockVpnEngine implements VpnEngine {
   Future<bool> connect(
     ServerConfig server, {
     required String clientPrivateKey,
+    bool killSwitch = false,
+    List<String> excludedApps = const [],
   }) async {
     _status = VpnConnectionStatus.connecting;
     await Future.delayed(const Duration(seconds: 2));
@@ -52,7 +54,6 @@ class MockVpnEngine implements VpnEngine {
       return null;
     }
 
-    // Simulate traffic
     final dlIncrement = _random.nextInt(500000) + 100000;
     final ulIncrement = _random.nextInt(200000) + 50000;
     _mockDownload += dlIncrement;

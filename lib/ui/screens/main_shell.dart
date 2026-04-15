@@ -19,24 +19,33 @@ class MainShell extends ConsumerWidget {
     return Scaffold(
       extendBody: true,
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.bgDark, AppColors.bgBlack],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: IndexedStack(
-          index: currentIndex,
-          children: const [
-            HomeScreen(),
-            ServerListScreen(),
-            SettingsScreen(),
-            ProfileScreen(),
-          ],
+        decoration: const BoxDecoration(gradient: AppColors.bgGradient),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          child: _buildPage(currentIndex),
         ),
       ),
       bottomNavigationBar: const FloatingBottomNav(),
     );
+  }
+
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const HomeScreen(key: ValueKey('home'));
+      case 1:
+        return const ServerListScreen(key: ValueKey('servers'));
+      case 2:
+        return const SettingsScreen(key: ValueKey('settings'));
+      case 3:
+        return const ProfileScreen(key: ValueKey('profile'));
+      default:
+        return const HomeScreen(key: ValueKey('home'));
+    }
   }
 }

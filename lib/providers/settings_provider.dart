@@ -15,46 +15,72 @@ class SettingsNotifier extends StateNotifier<VpnSettings> {
   }
 
   Future<void> _loadFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = VpnSettings(
-      killSwitchEnabled: prefs.getBool('killSwitch') ?? false,
-      dnsMode: prefs.getString('dnsMode') ?? 'cloudflare',
-      customDns1: prefs.getString('customDns1'),
-      customDns2: prefs.getString('customDns2'),
-      autoConnect: prefs.getBool('autoConnect') ?? false,
-    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      state = VpnSettings(
+        killSwitchEnabled: prefs.getBool('killSwitch') ?? false,
+        dnsMode: prefs.getString('dnsMode') ?? 'cloudflare',
+        customDns1: prefs.getString('customDns1'),
+        customDns2: prefs.getString('customDns2'),
+        autoConnect: prefs.getBool('autoConnect') ?? false,
+        excludedApps: prefs.getStringList('excludedApps') ?? [],
+      );
+    } catch (_) {
+      // Keep defaults on error
+    }
   }
 
   Future<void> _saveToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('killSwitch', state.killSwitchEnabled);
-    await prefs.setString('dnsMode', state.dnsMode);
-    if (state.customDns1 != null) {
-      await prefs.setString('customDns1', state.customDns1!);
-    }
-    if (state.customDns2 != null) {
-      await prefs.setString('customDns2', state.customDns2!);
-    }
-    await prefs.setBool('autoConnect', state.autoConnect);
+    await Future.wait([
+      prefs.setBool('killSwitch', state.killSwitchEnabled),
+      prefs.setString('dnsMode', state.dnsMode),
+      prefs.setBool('autoConnect', state.autoConnect),
+      prefs.setStringList('excludedApps', state.excludedApps),
+      if (state.customDns1 != null)
+        prefs.setString('customDns1', state.customDns1!)
+      else
+        prefs.remove('customDns1'),
+      if (state.customDns2 != null)
+        prefs.setString('customDns2', state.customDns2!)
+      else
+        prefs.remove('customDns2'),
+    ]);
   }
 
-  void setKillSwitch(bool enabled) {
+  Future<void> setKillSwitch(bool enabled) async {
     state = state.copyWith(killSwitchEnabled: enabled);
-    _saveToPrefs();
+    await _saveToPrefs();
   }
 
-  void setDnsMode(String mode) {
+  Future<void> setDnsMode(String mode) async {
     state = state.copyWith(dnsMode: mode);
-    _saveToPrefs();
+    await _saveToPrefs();
   }
 
-  void setCustomDns(String? dns1, String? dns2) {
+  Future<void> setCustomDns(String? dns1, String? dns2) async {
     state = state.copyWith(customDns1: dns1, customDns2: dns2);
-    _saveToPrefs();
+    await _saveToPrefs();
   }
 
-  void setAutoConnect(bool enabled) {
+  Future<void> setAutoConnect(bool enabled) async {
     state = state.copyWith(autoConnect: enabled);
-    _saveToPrefs();
+    await _saveToPrefs();
+  }
+
+  Future<void> setExcludedApps(List<String> apps) async {
+    state = state.copyWith(excludedApps: apps);
+    await _saveToPrefs();
+  }
+
+  Future<void> toggleExcludedApp(String packageName) async {
+    final current = List<String>.from(state.excludedApps);
+    if (current.contains(packageName)) {
+      current.remove(packageName);
+    } else {
+      current.add(packageName);
+    }
+    state = state.copyWith(excludedApps: current);
+    await _saveToPrefs();
   }
 }

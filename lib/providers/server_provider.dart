@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models/server_config.dart';
+import '../services/ping_service.dart';
+import '../services/vpn_engine.dart';
 import '../services/warp_service.dart';
-import '../services/wireguard_platform_channel.dart';
+import 'vpn_provider.dart';
 
 // ---------- WARP Registration ----------
 
@@ -16,13 +18,13 @@ class WarpState {
   final ServerConfig? server;
   final String? error;
 
-  const WarpState({
-    this.status = WarpStatus.idle,
-    this.server,
-    this.error,
-  });
+  const WarpState({this.status = WarpStatus.idle, this.server, this.error});
 
-  WarpState copyWith({WarpStatus? status, ServerConfig? server, String? error}) {
+  WarpState copyWith({
+    WarpStatus? status,
+    ServerConfig? server,
+    String? error,
+  }) {
     return WarpState(
       status: status ?? this.status,
       server: server ?? this.server,
@@ -32,28 +34,29 @@ class WarpState {
 }
 
 class WarpNotifier extends StateNotifier<WarpState> {
-  WarpNotifier() : super(const WarpState()) {
+  final VpnEngine _engine;
+
+  WarpNotifier(this._engine) : super(const WarpState()) {
     _init();
   }
 
   Future<void> _init() async {
-    // Check if already registered
     final existing = await WarpService.loadRegistration();
     if (existing != null) {
-      // Validate the cached registration - check for bad endpoint port
-      if (existing.endpoint.endsWith(':0') || !existing.endpoint.contains(':')) {
-        // Bad cached data, clear and re-register
+      if (existing.endpoint.endsWith(':0') ||
+          !existing.endpoint.contains(':')) {
         await WarpService.clearRegistration();
         await register();
         return;
       }
+      final server = WarpService.toServerConfig(existing);
+      final ping = await PingService.ping(server.endpoint);
       state = WarpState(
         status: WarpStatus.registered,
-        server: WarpService.toServerConfig(existing),
+        server: ping > 0 ? server.copyWith(estimatedPingMs: ping) : server,
       );
       return;
     }
-    // Auto-register
     await register();
   }
 
@@ -61,33 +64,36 @@ class WarpNotifier extends StateNotifier<WarpState> {
     state = state.copyWith(status: WarpStatus.registering, error: null);
 
     final reg = await WarpService.register(
-      generateKeyPair: () => WireGuardPlatformChannel().generateKeyPair(),
+      generateKeyPair: () => _engine.generateKeyPair(),
     );
 
     if (reg != null) {
+      final server = WarpService.toServerConfig(reg);
+      final ping = await PingService.ping(server.endpoint);
       state = WarpState(
         status: WarpStatus.registered,
-        server: WarpService.toServerConfig(reg),
+        server: ping > 0 ? server.copyWith(estimatedPingMs: ping) : server,
       );
     } else {
       state = const WarpState(
         status: WarpStatus.failed,
-        error: 'WARP registration failed. Check internet connection.',
+        error: '@warpFailed',
       );
     }
   }
 }
 
 final warpProvider = StateNotifierProvider<WarpNotifier, WarpState>((ref) {
-  return WarpNotifier();
+  final engine = ref.watch(vpnEngineProvider);
+  return WarpNotifier(engine);
 });
 
 // ---------- Imported Servers ----------
 
 final importedServersProvider =
     StateNotifierProvider<ImportedServersNotifier, List<ServerConfig>>((ref) {
-  return ImportedServersNotifier();
-});
+      return ImportedServersNotifier();
+    });
 
 class ImportedServersNotifier extends StateNotifier<List<ServerConfig>> {
   ImportedServersNotifier() : super([]) {
@@ -95,55 +101,47 @@ class ImportedServersNotifier extends StateNotifier<List<ServerConfig>> {
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getStringList('imported_servers');
-    if (json == null) return;
-    state = json.map((s) {
-      final map = jsonDecode(s) as Map<String, dynamic>;
-      return ServerConfig(
-        id: map['id'] as String,
-        country: map['country'] as String,
-        city: map['city'] as String,
-        countryCode: map['countryCode'] as String,
-        serverPublicKey: map['serverPublicKey'] as String,
-        endpoint: map['endpoint'] as String,
-        presharedKey: map['presharedKey'] as String?,
-        allowedIPs: (map['allowedIPs'] as List<dynamic>).cast<String>(),
-        persistentKeepalive: map['persistentKeepalive'] as int,
-        clientPrivateKey: map['clientPrivateKey'] as String?,
-        clientAddress: map['clientAddress'] as String,
-        dnsServers: (map['dnsServers'] as List<dynamic>).cast<String>(),
-        mtu: map['mtu'] as int,
-        estimatedPingMs: map['estimatedPingMs'] as int,
-      );
-    }).toList();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getStringList('imported_servers');
+      if (json == null) return;
+      state =
+          json.map((s) {
+            final map = jsonDecode(s) as Map<String, dynamic>;
+            return ServerConfig.fromJson(map);
+          }).toList();
+
+      _measurePings();
+    } catch (_) {
+      // Gracefully handle corrupt data
+    }
+  }
+
+  Future<void> _measurePings() async {
+    if (state.isEmpty) return;
+
+    // Parallel ping measurement
+    final futures = state.map((server) async {
+      final ping = await PingService.ping(server.endpoint);
+      return ping > 0 ? server.copyWith(estimatedPingMs: ping) : server;
+    });
+
+    final updated = await Future.wait(futures);
+    if (mounted) {
+      state = updated;
+    }
   }
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    final json = state.map((s) {
-      return jsonEncode({
-        'id': s.id,
-        'country': s.country,
-        'city': s.city,
-        'countryCode': s.countryCode,
-        'serverPublicKey': s.serverPublicKey,
-        'endpoint': s.endpoint,
-        'presharedKey': s.presharedKey,
-        'allowedIPs': s.allowedIPs,
-        'persistentKeepalive': s.persistentKeepalive,
-        'clientPrivateKey': s.clientPrivateKey,
-        'clientAddress': s.clientAddress,
-        'dnsServers': s.dnsServers,
-        'mtu': s.mtu,
-        'estimatedPingMs': s.estimatedPingMs,
-      });
-    }).toList();
+    final json = state.map((s) => jsonEncode(s.toJson())).toList();
     await prefs.setStringList('imported_servers', json);
   }
 
   Future<void> addServer(ServerConfig server) async {
-    state = [...state, server];
+    final ping = await PingService.ping(server.endpoint);
+    final updated = ping > 0 ? server.copyWith(estimatedPingMs: ping) : server;
+    state = [...state, updated];
     await _save();
   }
 
@@ -161,34 +159,33 @@ final serverListProvider = Provider<List<ServerConfig>>((ref) {
 
   final servers = <ServerConfig>[];
 
-  // WARP server at top
   if (warp.server != null) {
     servers.add(warp.server!);
   } else {
-    // Show placeholder while WARP is loading/registering
-    String statusText;
+    String statusKey;
     switch (warp.status) {
       case WarpStatus.idle:
       case WarpStatus.registering:
-        statusText = 'WARP (Registering...)';
+        statusKey = '@warpRegistering';
       case WarpStatus.failed:
-        statusText = 'WARP (Tap to Retry)';
+        statusKey = '@warpTapToRetry';
       case WarpStatus.registered:
-        statusText = 'WARP (Auto)';
+        statusKey = '@warpAuto';
     }
-    servers.add(ServerConfig(
-      id: 'warp-loading',
-      country: 'Cloudflare',
-      city: statusText,
-      countryCode: 'warp',
-      serverPublicKey: '',
-      endpoint: '',
-      clientAddress: '',
-      estimatedPingMs: 0,
-    ));
+    servers.add(
+      ServerConfig(
+        id: 'warp-loading',
+        country: 'Cloudflare',
+        city: statusKey,
+        countryCode: 'warp',
+        serverPublicKey: '',
+        endpoint: '',
+        clientAddress: '',
+        estimatedPingMs: 0,
+      ),
+    );
   }
 
-  // Imported servers next
   servers.addAll(imported);
 
   return servers;
@@ -199,8 +196,7 @@ final selectedServerProvider = StateProvider<ServerConfig>((ref) {
   return servers.first;
 });
 
-final groupedServersProvider =
-    Provider<Map<String, List<ServerConfig>>>((ref) {
+final groupedServersProvider = Provider<Map<String, List<ServerConfig>>>((ref) {
   final servers = ref.watch(serverListProvider);
   final grouped = <String, List<ServerConfig>>{};
   for (final s in servers) {

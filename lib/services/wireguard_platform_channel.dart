@@ -23,6 +23,8 @@ class WireGuardPlatformChannel implements VpnEngine {
   Future<bool> connect(
     ServerConfig server, {
     required String clientPrivateKey,
+    bool killSwitch = false,
+    List<String> excludedApps = const [],
   }) async {
     try {
       final config = {
@@ -35,6 +37,8 @@ class WireGuardPlatformChannel implements VpnEngine {
         'allowedIPs': server.allowedIPs.join(','),
         'presharedKey': server.presharedKey ?? '',
         'persistentKeepalive': server.persistentKeepalive,
+        'killSwitch': killSwitch,
+        'excludedApps': excludedApps,
       };
       final result = await _channel.invokeMethod<bool>('connect', config);
       return result ?? false;
@@ -99,6 +103,24 @@ class WireGuardPlatformChannel implements VpnEngine {
       };
     } on PlatformException {
       rethrow;
+    }
+  }
+
+  Future<List<Map<String, String>>> getInstalledApps() async {
+    try {
+      final result = await _channel.invokeMethod<List<Object?>>(
+        'getInstalledApps',
+      );
+      if (result == null) return [];
+      return result.map((item) {
+        final map = item as Map<Object?, Object?>;
+        return {
+          'packageName': map['packageName'] as String? ?? '',
+          'appName': map['appName'] as String? ?? '',
+        };
+      }).toList();
+    } on PlatformException {
+      return [];
     }
   }
 }

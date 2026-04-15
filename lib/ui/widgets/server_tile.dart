@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/server_config.dart';
+import 'server_avatar.dart';
 
 class ServerTile extends StatelessWidget {
   final ServerConfig server;
@@ -17,85 +20,61 @@ class ServerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: isSelected
-              ? AppColors.neonTurquoise.withValues(alpha: 0.1)
-              : Colors.white.withValues(alpha: 0.05),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.neonTurquoise.withValues(alpha: 0.4)
-                : Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-        child: Row(
-          children: [
-            _buildServerIcon(server),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    server.city,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    server.country,
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            PingBadge(pingMs: server.estimatedPingMs),
-            const SizedBox(width: 10),
-            if (isSelected)
-              const Icon(
-                Icons.check_circle,
-                color: AppColors.neonTurquoise,
-                size: 22,
-              )
-            else
-              Icon(Icons.circle_outlined, color: Colors.grey[600], size: 22),
-          ],
-        ),
-      ),
-    );
-  }
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
 
-  Widget _buildServerIcon(ServerConfig server) {
-    if (server.countryCode == 'warp') {
-      return Container(
-        width: 36,
-        height: 36,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [Color(0xFFF48120), Color(0xFFF6821F)],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: 14,
           ),
-        ),
-        child: const Icon(Icons.cloud, color: Colors.white, size: 20),
-      );
-    }
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.blue.withValues(alpha: 0.2),
-        image: DecorationImage(
-          image: NetworkImage(server.flagUrl),
-          fit: BoxFit.cover,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+            color: isSelected
+                ? AppColors.neonTurquoise.withValues(alpha: 0.1)
+                : AppColors.cardBg,
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.neonTurquoise.withValues(alpha: 0.4)
+                  : AppColors.cardBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              ServerAvatar(server: server),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.resolve(server.city), style: theme.textTheme.bodyLarge),
+                    const SizedBox(height: 2),
+                    Text(server.country, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              PingBadge(pingMs: server.estimatedPingMs),
+              const SizedBox(width: AppSpacing.sm),
+              if (isSelected)
+                const Icon(
+                  Icons.check_circle,
+                  color: AppColors.neonTurquoise,
+                  size: 22,
+                )
+              else
+                Icon(
+                  Icons.circle_outlined,
+                  color: AppColors.textSecondary.withValues(alpha: 0.5),
+                  size: 22,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -124,9 +103,8 @@ class PingBadge extends StatelessWidget {
       ),
       child: Text(
         '$pingMs ms',
-        style: TextStyle(
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
           color: _color,
-          fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
       ),

@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/format_utils.dart';
 import '../../providers/vpn_provider.dart';
 
@@ -12,6 +14,7 @@ class SpeedStatsCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final vpnState = ref.watch(vpnStateProvider);
     if (!vpnState.isConnected) return const SizedBox.shrink();
 
@@ -19,31 +22,65 @@ class SpeedStatsCard extends ConsumerWidget {
 
     return statsAsync.when(
       data: (stats) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white.withValues(alpha: 0.07),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xxl,
+          vertical: 18,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLarge),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.08),
+              Colors.white.withValues(alpha: 0.04),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: Column(
           children: [
-            _buildStatColumn(
-              icon: Icons.arrow_downward_rounded,
-              label: 'Download',
-              value: FormatUtils.formatSpeed(stats.downloadSpeedBps),
-              color: AppColors.neonTurquoise,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatColumn(
+                  context,
+                  icon: Icons.arrow_downward_rounded,
+                  label: l.download,
+                  value: FormatUtils.formatSpeed(stats.downloadSpeedBps),
+                  color: AppColors.neonTurquoise,
+                ),
+                Container(
+                  width: 1,
+                  height: 45,
+                  color: AppColors.divider,
+                ),
+                _buildStatColumn(
+                  context,
+                  icon: Icons.arrow_upward_rounded,
+                  label: l.upload,
+                  value: FormatUtils.formatSpeed(stats.uploadSpeedBps),
+                  color: AppColors.electricBlue,
+                ),
+              ],
             ),
-            Container(
-              width: 1,
-              height: 40,
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
-            _buildStatColumn(
-              icon: Icons.arrow_upward_rounded,
-              label: 'Upload',
-              value: FormatUtils.formatSpeed(stats.uploadSpeedBps),
-              color: AppColors.electricBlue,
+            const SizedBox(height: AppSpacing.md),
+            Divider(color: AppColors.divider, height: 1),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildDataColumn(
+                  context,
+                  label: l.totalDown,
+                  value: FormatUtils.formatBytes(stats.downloadBytes),
+                ),
+                _buildDataColumn(
+                  context,
+                  label: l.totalUp,
+                  value: FormatUtils.formatBytes(stats.uploadBytes),
+                ),
+              ],
             ),
           ],
         ),
@@ -53,27 +90,50 @@ class SpeedStatsCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatColumn({
+  Widget _buildStatColumn(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
     required Color color,
   }) {
+    final theme = Theme.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withValues(alpha: 0.15),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: theme.textTheme.titleSmall?.copyWith(fontSize: 17),
         ),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+        Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
+      ],
+    );
+  }
+
+  Widget _buildDataColumn(
+    BuildContext context, {
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.labelMedium?.copyWith(fontSize: 13),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 10)),
       ],
     );
   }
@@ -128,13 +188,18 @@ class _ConnectionTimerDisplayState
 
     if (!vpnState.isConnected) return const SizedBox.shrink();
 
-    return Text(
-      FormatUtils.formatDuration(_elapsed),
-      style: TextStyle(
-        color: Colors.grey[400],
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 2,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: AppColors.neonTurquoise.withValues(alpha: 0.1),
+      ),
+      child: Text(
+        FormatUtils.formatDuration(_elapsed),
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: AppColors.neonTurquoise,
+          letterSpacing: 3,
+        ),
       ),
     );
   }

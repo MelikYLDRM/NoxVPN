@@ -4,6 +4,7 @@ class VpnSettings {
   final String? customDns1;
   final String? customDns2;
   final bool autoConnect;
+  final List<String> excludedApps;
 
   const VpnSettings({
     this.killSwitchEnabled = false,
@@ -11,6 +12,7 @@ class VpnSettings {
     this.customDns1,
     this.customDns2,
     this.autoConnect = false,
+    this.excludedApps = const [],
   });
 
   factory VpnSettings.defaults() => const VpnSettings();
@@ -34,16 +36,22 @@ class VpnSettings {
   VpnSettings copyWith({
     bool? killSwitchEnabled,
     String? dnsMode,
-    String? customDns1,
-    String? customDns2,
+    Object? customDns1 = _sentinel,
+    Object? customDns2 = _sentinel,
     bool? autoConnect,
+    List<String>? excludedApps,
   }) {
     return VpnSettings(
       killSwitchEnabled: killSwitchEnabled ?? this.killSwitchEnabled,
       dnsMode: dnsMode ?? this.dnsMode,
-      customDns1: customDns1 ?? this.customDns1,
-      customDns2: customDns2 ?? this.customDns2,
+      customDns1:
+          customDns1 == _sentinel ? this.customDns1 : customDns1 as String?,
+      customDns2:
+          customDns2 == _sentinel ? this.customDns2 : customDns2 as String?,
       autoConnect: autoConnect ?? this.autoConnect,
+      excludedApps: excludedApps ?? this.excludedApps,
     );
   }
+
+  static const _sentinel = Object();
 }

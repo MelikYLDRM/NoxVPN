@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../data/models/server_config.dart';
+import '../../data/models/vpn_status.dart';
 import '../../providers/navigation_provider.dart';
 import '../../providers/server_provider.dart';
+import '../../providers/vpn_provider.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/connection_hub.dart';
-import '../widgets/glass_card.dart';
+import '../widgets/server_avatar.dart';
 import '../widgets/speed_stats_card.dart';
 import '../widgets/server_tile.dart';
 
@@ -19,8 +24,9 @@ class HomeScreen extends ConsumerWidget {
     final selectedServer = ref.watch(selectedServerProvider);
     final servers = ref.watch(serverListProvider);
     final warpState = ref.watch(warpProvider);
+    final vpnState = ref.watch(vpnStateProvider);
+    final l = AppLocalizations.of(context);
 
-    // Sort servers by ping for "Fastest Servers"
     final fastestServers = [...servers]
       ..sort((a, b) => a.estimatedPingMs.compareTo(b.estimatedPingMs));
     final topServers = fastestServers.take(5).toList();
@@ -32,35 +38,40 @@ class HomeScreen extends ConsumerWidget {
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenPadding,
+              ),
               child: Column(
                 children: [
-                  const SizedBox(height: 5),
-                  // WARP status banner
+                  const SizedBox(height: AppSpacing.xs),
                   if (warpState.status == WarpStatus.registering)
                     _buildWarpBanner(
-                      'Setting up Cloudflare WARP...',
-                      Icons.hourglass_bottom,
-                      Colors.orangeAccent,
+                      context,
+                      l.settingUpTunnel,
+                      Icons.hourglass_bottom_rounded,
+                      AppColors.warningOrange,
                     ),
                   if (warpState.status == WarpStatus.failed)
                     _buildWarpBanner(
-                      warpState.error ?? 'WARP registration failed',
-                      Icons.error_outline,
-                      Colors.redAccent,
-                      onRetry: () =>
-                          ref.read(warpProvider.notifier).register(),
+                      context,
+                      l.resolve(warpState.error ?? '@warpFailed'),
+                      Icons.error_outline_rounded,
+                      AppColors.errorRed,
+                      onRetry: () => ref.read(warpProvider.notifier).register(),
                     ),
                   const ConnectionHub(),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.sm),
                   const ConnectionTimerDisplay(),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: AppSpacing.lg),
                   const SpeedStatsCard(),
-                  const SizedBox(height: 15),
-                  _buildLocationCard(ref, selectedServer),
-                  const SizedBox(height: 20),
-                  _buildFastestServers(ref, topServers),
-                  const SizedBox(height: 90),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildLocationCard(context, ref, selectedServer, vpnState),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (topServers.length > 1)
+                    _buildFastestServers(context, ref, topServers),
+                  SizedBox(
+                    height: AppSpacing.bottomNavHeight + AppSpacing.lg,
+                  ),
                 ],
               ),
             ),
@@ -71,43 +82,61 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildWarpBanner(
+    BuildContext context,
     String message,
     IconData icon,
     Color color, {
     VoidCallback? onRetry,
   }) {
+    final l = AppLocalizations.of(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: color.withValues(alpha: 0.15),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        color: color.withValues(alpha: 0.1),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(color: color, fontSize: 13),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: color,
+              ),
             ),
           ),
           if (onRetry != null)
-            GestureDetector(
-              onTap: onRetry,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: color.withValues(alpha: 0.2),
-                ),
-                child: Text(
-                  'Retry',
-                  style: TextStyle(
-                      color: color, fontSize: 12, fontWeight: FontWeight.bold),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  onRetry();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: color.withValues(alpha: 0.15),
+                  ),
+                  child: Text(
+                    l.retry,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -116,111 +145,219 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLocationCard(WidgetRef ref, ServerConfig selectedServer) {
-    return GestureDetector(
-      onTap: () {
-        ref.read(currentTabIndexProvider.notifier).state = 1;
-      },
-      child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                _buildServerAvatar(selectedServer, 40),
-                const SizedBox(width: 15),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildLocationCard(
+    BuildContext context,
+    WidgetRef ref,
+    ServerConfig selectedServer,
+    VpnState vpnState,
+  ) {
+    final isConnected = vpnState.isConnected;
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLarge),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          ref.read(currentTabIndexProvider.notifier).state = 1;
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 400),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.lg,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.cardRadiusLarge),
+            gradient: isConnected
+                ? LinearGradient(
+                    colors: [
+                      AppColors.neonTurquoise.withValues(alpha: 0.1),
+                      AppColors.electricBlue.withValues(alpha: 0.05),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                : null,
+            color: isConnected ? null : AppColors.cardBg,
+            border: Border.all(
+              color: isConnected
+                  ? AppColors.neonTurquoise.withValues(alpha: 0.3)
+                  : AppColors.cardBorder,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
                   children: [
-                    Text(
-                      selectedServer.country,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    ServerAvatar(server: selectedServer, size: 40),
+                    const SizedBox(width: AppSpacing.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            selectedServer.country,
+                            style: theme.textTheme.titleSmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            l.resolve(selectedServer.city),
+                            style: theme.textTheme.bodyMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      selectedServer.city,
-                      style: TextStyle(color: Colors.grey[400], fontSize: 13),
                     ),
                   ],
                 ),
-              ],
-            ),
-            Row(
-              children: [
-                const Icon(
-                  Icons.wifi,
-                  color: AppColors.neonTurquoise,
-                  size: 20,
-                ),
-                const SizedBox(width: 5),
-                PingBadge(pingMs: selectedServer.estimatedPingMs),
-                const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: Colors.grey[600], size: 20),
-              ],
-            ),
-          ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isConnected)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.successGreen.withValues(alpha: 0.15),
+                      ),
+                      child: Text(
+                        l.active,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.successGreen,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: AppSpacing.xs),
+                  PingBadge(pingMs: selectedServer.estimatedPingMs),
+                  const SizedBox(width: AppSpacing.sm),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFastestServers(WidgetRef ref, List<ServerConfig> servers) {
+  Widget _buildFastestServers(
+    BuildContext context,
+    WidgetRef ref,
+    List<ServerConfig> servers,
+  ) {
+    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Fastest Servers',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(l.quickConnect, style: theme.textTheme.titleMedium),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  ref.read(currentTabIndexProvider.notifier).state = 1;
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Text(
+                    l.seeAll,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: AppColors.neonTurquoise,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 15),
+        const SizedBox(height: AppSpacing.md),
         SizedBox(
-          height: 120,
+          height: 110,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: servers.length,
             physics: const BouncingScrollPhysics(),
             itemBuilder: (context, index) {
               final server = servers[index];
-              return GestureDetector(
-                onTap: () {
-                  ref.read(selectedServerProvider.notifier).state = server;
-                },
-                child: Container(
-                  width: 130,
-                  margin: const EdgeInsets.only(right: 15),
-                  child: GlassCard(
-                    padding: const EdgeInsets.all(15),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildServerAvatar(server, 30),
-                        const SizedBox(height: 10),
-                        Text(
-                          server.city,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+              final isSelected =
+                  ref.watch(selectedServerProvider).id == server.id;
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.sm),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref.read(selectedServerProvider.notifier).state = server;
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      width: 110,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        color: isSelected
+                            ? AppColors.neonTurquoise.withValues(alpha: 0.1)
+                            : AppColors.cardBg,
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.neonTurquoise.withValues(alpha: 0.4)
+                              : AppColors.cardBorder,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${server.estimatedPingMs} ms',
-                          style: TextStyle(
-                            color: AppColors.neonTurquoise.withValues(alpha: 0.8),
-                            fontSize: 12,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ServerAvatar(server: server, size: 28),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            l.resolve(server.city),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 2),
+                          Text(
+                            '${server.estimatedPingMs} ms',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.neonTurquoise.withValues(
+                                alpha: 0.8,
+                              ),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -229,34 +366,6 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildServerAvatar(ServerConfig server, double size) {
-    if (server.countryCode == 'warp') {
-      return Container(
-        width: size,
-        height: size,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [Color(0xFFF48120), Color(0xFFF6821F)],
-          ),
-        ),
-        child: Icon(Icons.cloud, color: Colors.white, size: size * 0.55),
-      );
-    }
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.blue.withValues(alpha: 0.2),
-        image: DecorationImage(
-          image: NetworkImage(server.flagUrl),
-          fit: BoxFit.cover,
-        ),
-      ),
     );
   }
 }

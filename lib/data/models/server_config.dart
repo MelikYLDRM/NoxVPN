@@ -33,7 +33,46 @@ class ServerConfig {
 
   String get flagUrl => 'https://flagcdn.com/w320/$countryCode.png';
 
-  bool get hasPrivateKey => clientPrivateKey != null && clientPrivateKey!.isNotEmpty;
+  bool get hasPrivateKey =>
+      clientPrivateKey != null && clientPrivateKey!.isNotEmpty;
+
+  bool get isWarp => countryCode == 'warp';
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'country': country,
+    'city': city,
+    'countryCode': countryCode,
+    'serverPublicKey': serverPublicKey,
+    'endpoint': endpoint,
+    'presharedKey': presharedKey,
+    'allowedIPs': allowedIPs,
+    'persistentKeepalive': persistentKeepalive,
+    'clientPrivateKey': clientPrivateKey,
+    'clientAddress': clientAddress,
+    'dnsServers': dnsServers,
+    'mtu': mtu,
+    'estimatedPingMs': estimatedPingMs,
+  };
+
+  factory ServerConfig.fromJson(Map<String, dynamic> map) {
+    return ServerConfig(
+      id: map['id'] as String,
+      country: map['country'] as String,
+      city: map['city'] as String,
+      countryCode: map['countryCode'] as String,
+      serverPublicKey: map['serverPublicKey'] as String,
+      endpoint: map['endpoint'] as String,
+      presharedKey: map['presharedKey'] as String?,
+      allowedIPs: (map['allowedIPs'] as List<dynamic>).cast<String>(),
+      persistentKeepalive: map['persistentKeepalive'] as int,
+      clientPrivateKey: map['clientPrivateKey'] as String?,
+      clientAddress: map['clientAddress'] as String,
+      dnsServers: (map['dnsServers'] as List<dynamic>).cast<String>(),
+      mtu: map['mtu'] as int,
+      estimatedPingMs: map['estimatedPingMs'] as int,
+    );
+  }
 
   ServerConfig copyWith({
     String? id,

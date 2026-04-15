@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
@@ -41,7 +42,7 @@ class MyVpnService : VpnService() {
             ACTION_CONNECT -> connect()
             ACTION_DISCONNECT -> disconnect()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun connect() {
@@ -52,7 +53,12 @@ class MyVpnService : VpnService() {
         }
 
         TunnelManager.status = TunnelStatus.connecting
-        startForeground(NOTIFICATION_ID, createNotification("Connecting..."))
+        val killSwitch = TunnelManager.killSwitchEnabled
+        val excludedApps = TunnelManager.excludedApps
+
+        startForeground(NOTIFICATION_ID, createNotification(
+            if (killSwitch) "Connecting (Kill Switch ON)..." else "Connecting..."
+        ))
 
         thread {
             try {
@@ -61,8 +67,13 @@ class MyVpnService : VpnService() {
 
                 TunnelManager.status = TunnelStatus.connected
 
+                val notificationText = buildString {
+                    append("Connected")
+                    if (killSwitch) append(" | Kill Switch ON")
+                    if (excludedApps.isNotEmpty()) append(" | ${excludedApps.size} apps excluded")
+                }
                 val notificationManager = getSystemService(NotificationManager::class.java)
-                notificationManager.notify(NOTIFICATION_ID, createNotification("Connected"))
+                notificationManager.notify(NOTIFICATION_ID, createNotification(notificationText))
 
                 startStatsPolling()
             } catch (e: Exception) {
@@ -110,7 +121,7 @@ class MyVpnService : VpnService() {
                     Log.e(TAG, "Stats polling error: ${e.message}")
                 }
             }
-        }, 1000, 1000)
+        }, 3000, 3000)
     }
 
     private fun stopStatsPolling() {
