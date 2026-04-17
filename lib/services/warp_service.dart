@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/datasources/warp_endpoints.dart';
 import '../data/models/server_config.dart';
 
 /// Cloudflare WARP registration response model
@@ -171,23 +172,59 @@ class WarpService {
     }
   }
 
-  /// Convert WARP registration to a ServerConfig
-  static ServerConfig toServerConfig(WarpRegistration reg) {
+  /// Convert WARP registration to a ServerConfig for a specific endpoint
+  static ServerConfig toServerConfig(
+    WarpRegistration reg, {
+    String? overrideEndpoint,
+    String? label,
+    String? region,
+  }) {
+    final endpoint = overrideEndpoint ?? reg.endpoint;
+    final city = label ?? 'WARP (Auto)';
+    final id = overrideEndpoint != null
+        ? 'warp-${overrideEndpoint.replaceAll(':', '-').replaceAll('.', '_')}'
+        : 'warp-auto';
+
     return ServerConfig(
-      id: 'warp-auto',
-      country: 'Cloudflare',
-      city: 'WARP (Auto)',
+      id: id,
+      country: region ?? 'Cloudflare',
+      city: city,
       countryCode: 'warp',
       serverPublicKey: reg.serverPublicKey,
-      endpoint: reg.endpoint,
+      endpoint: endpoint,
       clientPrivateKey: reg.clientPrivateKey,
       clientAddress: reg.clientIpv4,
       allowedIPs: const ['0.0.0.0/0', '::/0'],
       dnsServers: const ['1.1.1.1', '1.0.0.1'],
       mtu: 1400,
-      persistentKeepalive: 25,
+      persistentKeepalive: 15,
       estimatedPingMs: 15,
     );
+  }
+
+  /// Generate multiple ServerConfig entries from a single registration
+  /// by using different WARP endpoints. Returns immediately with estimated pings.
+  /// Actual pings should be measured later via refreshPings().
+  static List<ServerConfig> toMultipleServerConfigs(
+    WarpRegistration reg,
+  ) {
+    return WarpEndpoints.endpoints.map((warpEndpoint) {
+      return ServerConfig(
+        id: 'warp-${warpEndpoint.host.replaceAll('.', '_')}',
+        country: 'Cloudflare',
+        city: '${warpEndpoint.label} (${warpEndpoint.region})',
+        countryCode: 'warp',
+        serverPublicKey: reg.serverPublicKey,
+        endpoint: warpEndpoint.endpointString,
+        clientPrivateKey: reg.clientPrivateKey,
+        clientAddress: reg.clientIpv4,
+        allowedIPs: const ['0.0.0.0/0', '::/0'],
+        dnsServers: const ['1.1.1.1', '1.0.0.1'],
+        mtu: 1400,
+        persistentKeepalive: 15,
+        estimatedPingMs: 50,
+      );
+    }).toList();
   }
 
   /// Clear stored WARP registration

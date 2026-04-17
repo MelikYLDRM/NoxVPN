@@ -27,7 +27,9 @@ class SettingsScreen extends ConsumerWidget {
     return SafeArea(
       child: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenPadding),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.screenPadding,
+        ),
         children: [
           const SizedBox(height: AppSpacing.lg),
           Row(
@@ -72,6 +74,20 @@ class SettingsScreen extends ConsumerWidget {
               notifier.setAutoConnect(val);
             },
           ),
+          _buildSwitchTile(
+            context: context,
+            icon: Icons.public_off_rounded,
+            title: 'IPv6',
+            subtitle: settings.ipv6Enabled
+                ? 'IPv6 traffic routed through VPN'
+                : 'IPv6 disabled (faster, recommended)',
+            value: settings.ipv6Enabled,
+            onChanged: (val) {
+              HapticFeedback.selectionClick();
+              notifier.setIpv6Enabled(val);
+            },
+          ),
+          _buildKeepaliveTile(context, ref, settings.keepaliveInterval),
           const SizedBox(height: AppSpacing.xxl),
 
           _buildSectionTitle(context, l.sectionSplitTunnel),
@@ -79,6 +95,17 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xxl),
 
           _buildSectionTitle(context, l.sectionDns),
+          _buildDnsTile(
+            context: context,
+            title: 'Auto (Best)',
+            subtitle: 'Automatically select fastest DNS',
+            icon: Icons.speed_rounded,
+            isSelected: settings.dnsMode == 'auto',
+            onTap: () {
+              HapticFeedback.selectionClick();
+              notifier.setDnsMode('auto');
+            },
+          ),
           _buildDnsTile(
             context: context,
             title: l.cloudflare,
@@ -99,6 +126,17 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () {
               HapticFeedback.selectionClick();
               notifier.setDnsMode('google');
+            },
+          ),
+          _buildDnsTile(
+            context: context,
+            title: 'Quad9',
+            subtitle: '9.9.9.9 / 149.112.112.112',
+            icon: Icons.security_rounded,
+            isSelected: settings.dnsMode == 'quad9',
+            onTap: () {
+              HapticFeedback.selectionClick();
+              notifier.setDnsMode('quad9');
             },
           ),
           _buildDnsTile(
@@ -311,16 +349,16 @@ class SettingsScreen extends ConsumerWidget {
                                     children: [
                                       Text(
                                         nativeName,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyLarge,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge,
                                       ),
                                       if (nativeName != englishName)
                                         Text(
                                           englishName,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
                                         ),
                                     ],
                                   ),
@@ -614,6 +652,79 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildKeepaliveTile(
+    BuildContext context,
+    WidgetRef ref,
+    int currentValue,
+  ) {
+    final theme = Theme.of(context);
+    final options = [
+      (10, 'Aggressive (10s)'),
+      (15, 'Recommended (15s)'),
+      (25, 'Standard (25s)'),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: 14,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppSpacing.cardRadius),
+        color: AppColors.cardBg,
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.neonTurquoise.withValues(alpha: 0.1),
+            ),
+            child: const Icon(
+              Icons.timer_rounded,
+              color: AppColors.neonTurquoise,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Keepalive', style: theme.textTheme.bodyLarge),
+                const SizedBox(height: 2),
+                Text(
+                  'NAT keep-alive interval: ${currentValue}s',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          DropdownButton<int>(
+            value: options.any((o) => o.$1 == currentValue) ? currentValue : 15,
+            dropdownColor: AppColors.bgDark,
+            underline: const SizedBox(),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.neonTurquoise,
+            ),
+            items: options.map((opt) {
+              return DropdownMenuItem(value: opt.$1, child: Text(opt.$2));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) {
+                HapticFeedback.selectionClick();
+                ref.read(settingsProvider.notifier).setKeepaliveInterval(val);
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildImportButton(BuildContext context, WidgetRef ref) {
     final l = AppLocalizations.of(context);
     return Material(
@@ -637,7 +748,11 @@ class SettingsScreen extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.file_upload_outlined, color: Colors.white, size: 22),
+                const Icon(
+                  Icons.file_upload_outlined,
+                  color: Colors.white,
+                  size: 22,
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
                   l.importConfFile,
@@ -674,7 +789,11 @@ class SettingsScreen extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.paste_rounded, color: AppColors.neonTurquoise, size: 22),
+              const Icon(
+                Icons.paste_rounded,
+                color: AppColors.neonTurquoise,
+                size: 22,
+              ),
               const SizedBox(width: AppSpacing.sm),
               Text(
                 l.pasteWireguardConfig,
@@ -780,9 +899,7 @@ class SettingsScreen extends ConsumerWidget {
               TextField(
                 controller: nameController,
                 style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: l.serverNameHint,
-                ),
+                decoration: InputDecoration(hintText: l.serverNameHint),
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
@@ -846,17 +963,13 @@ class SettingsScreen extends ConsumerWidget {
             TextField(
               controller: dns1Controller,
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: l.primaryDnsHint,
-              ),
+              decoration: InputDecoration(hintText: l.primaryDnsHint),
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: dns2Controller,
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: l.secondaryDnsHint,
-              ),
+              decoration: InputDecoration(hintText: l.secondaryDnsHint),
             ),
           ],
         ),
@@ -979,10 +1092,7 @@ class _SplitTunnelSheetState extends ConsumerState<_SplitTunnelSheet> {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    l.splitTunnelBypass,
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  Text(l.splitTunnelBypass, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: AppSpacing.md),
                   Container(
                     decoration: BoxDecoration(
@@ -1061,7 +1171,12 @@ class _SplitTunnelSheetState extends ConsumerState<_SplitTunnelSheet> {
                             ),
                           ),
                         ),
-                        title: Text(name, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14)),
+                        title: Text(
+                          name,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 14,
+                          ),
+                        ),
                         subtitle: Text(
                           pkg,
                           style: theme.textTheme.bodySmall?.copyWith(

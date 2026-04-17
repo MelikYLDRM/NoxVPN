@@ -180,10 +180,7 @@ class _ConnectionHubState extends ConsumerState<ConnectionHub>
                                 end: Alignment.bottomRight,
                               )
                             : const LinearGradient(
-                                colors: [
-                                  Color(0xFF3A3A5A),
-                                  Color(0xFF1E1E2E),
-                                ],
+                                colors: [Color(0xFF3A3A5A), Color(0xFF1E1E2E)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -300,9 +297,7 @@ class _ConnectionHubState extends ConsumerState<ConnectionHub>
               ),
               child: Text(
                 _buttonText(vpnState.status),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  letterSpacing: 1.1,
-                ),
+                style: theme.textTheme.labelLarge?.copyWith(letterSpacing: 1.1),
               ),
             ),
           ),
@@ -322,6 +317,8 @@ class _ConnectionHubState extends ConsumerState<ConnectionHub>
         return l.securing;
       case VpnConnectionStatus.connected:
         return l.secured;
+      case VpnConnectionStatus.reconnecting:
+        return 'Reconnecting...';
       case VpnConnectionStatus.disconnecting:
         return l.disconnecting;
       case VpnConnectionStatus.error:
@@ -339,6 +336,8 @@ class _ConnectionHubState extends ConsumerState<ConnectionHub>
         return l.connecting;
       case VpnConnectionStatus.connected:
         return l.disconnect;
+      case VpnConnectionStatus.reconnecting:
+        return 'Reconnecting...';
       case VpnConnectionStatus.disconnecting:
         return l.disconnectingBtn;
       case VpnConnectionStatus.error:

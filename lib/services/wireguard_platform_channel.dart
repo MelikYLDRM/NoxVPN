@@ -8,6 +8,18 @@ import 'vpn_engine.dart';
 
 class WireGuardPlatformChannel implements VpnEngine {
   static const _channel = MethodChannel(AppConstants.vpnChannelName);
+  static const _eventChannel = EventChannel(AppConstants.vpnEventChannelName);
+
+  /// Stream of VPN status changes pushed from native side
+  static Stream<VpnConnectionStatus> get statusStream {
+    return _eventChannel.receiveBroadcastStream().map((event) {
+      final statusName = event as String;
+      return VpnConnectionStatus.values.firstWhere(
+        (s) => s.name == statusName,
+        orElse: () => VpnConnectionStatus.disconnected,
+      );
+    });
+  }
 
   @override
   Future<bool> prepareVpn() async {

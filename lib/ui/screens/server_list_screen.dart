@@ -34,6 +34,7 @@ class _ServerListScreenState extends ConsumerState<ServerListScreen> {
   Widget build(BuildContext context) {
     final allServers = ref.watch(serverListProvider);
     final selectedServer = ref.watch(selectedServerProvider);
+    final favorites = ref.watch(favoriteServersProvider);
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context);
 
@@ -180,8 +181,7 @@ class _ServerListScreenState extends ConsumerState<ServerListScreen> {
                         ),
                         ...entry.value.map((server) {
                           final isImported =
-                              server.id != 'warp-auto' &&
-                              server.id != 'warp-loading';
+                              !server.isWarp && server.id != 'warp-loading';
                           return Dismissible(
                             key: Key(server.id),
                             direction: isImported
@@ -208,8 +208,7 @@ class _ServerListScreenState extends ConsumerState<ServerListScreen> {
                                       ),
                                     ),
                                     TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(ctx, true),
+                                      onPressed: () => Navigator.pop(ctx, true),
                                       child: Text(
                                         l.remove,
                                         style: const TextStyle(
@@ -250,14 +249,23 @@ class _ServerListScreenState extends ConsumerState<ServerListScreen> {
                             child: ServerTile(
                               server: server,
                               isSelected: selectedServer.id == server.id,
+                              isFavorite: favorites.contains(server.id),
+                              onFavoriteToggle: () {
+                                HapticFeedback.selectionClick();
+                                ref
+                                    .read(favoriteServersProvider.notifier)
+                                    .toggle(server.id);
+                              },
                               onTap: () {
                                 HapticFeedback.selectionClick();
                                 ref
-                                    .read(selectedServerProvider.notifier)
-                                    .state = server;
+                                        .read(selectedServerProvider.notifier)
+                                        .state =
+                                    server;
                                 ref
-                                    .read(currentTabIndexProvider.notifier)
-                                    .state = 0;
+                                        .read(currentTabIndexProvider.notifier)
+                                        .state =
+                                    0;
                               },
                             ),
                           );
@@ -265,9 +273,7 @@ class _ServerListScreenState extends ConsumerState<ServerListScreen> {
                       ],
                     );
                   }),
-                  SizedBox(
-                    height: AppSpacing.bottomNavHeight + AppSpacing.lg,
-                  ),
+                  SizedBox(height: AppSpacing.bottomNavHeight + AppSpacing.lg),
                 ],
               ),
             ),

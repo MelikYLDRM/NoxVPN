@@ -12,18 +12,26 @@ class PingService {
       final port = int.tryParse(parts[1]) ?? 51820;
 
       final stopwatch = Stopwatch()..start();
-      final socket = await Socket.connect(
-        host,
-        port,
-        timeout: const Duration(seconds: 3),
-      );
-      stopwatch.stop();
-      socket.destroy();
-
-      return stopwatch.elapsedMilliseconds;
+      try {
+        final socket = await Socket.connect(
+          host,
+          port,
+          timeout: const Duration(milliseconds: 1500),
+        );
+        stopwatch.stop();
+        socket.destroy();
+        return stopwatch.elapsedMilliseconds;
+      } on SocketException {
+        stopwatch.stop();
+        // Connection refused still gives us a latency measurement
+        // since the packet reached the host and came back
+        final elapsed = stopwatch.elapsedMilliseconds;
+        if (elapsed > 0 && elapsed < 1500) {
+          return elapsed;
+        }
+        return -1;
+      }
     } catch (_) {
-      // TCP connection may be refused but latency is still measurable
-      // from the time it took to get the rejection
       return -1;
     }
   }

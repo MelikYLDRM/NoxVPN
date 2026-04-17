@@ -12,22 +12,30 @@ enum class TunnelStatus {
 
 object TunnelManager {
     var config: Config? = null
-    var status: TunnelStatus = TunnelStatus.disconnected
     var killSwitchEnabled: Boolean = false
     var excludedApps: List<String> = emptyList()
+    var statusListener: ((TunnelStatus) -> Unit)? = null
+
+    var status: TunnelStatus = TunnelStatus.disconnected
+        set(value) {
+            field = value
+            statusListener?.invoke(value)
+        }
 
     private var lastDownloadBytes: Long = 0
     private var lastUploadBytes: Long = 0
     private var prevDownloadBytes: Long = 0
     private var prevUploadBytes: Long = 0
     private var lastStatsTime: Long = System.currentTimeMillis()
+    private var prevStatsTime: Long = System.currentTimeMillis()
 
     fun updateStats(downloadBytes: Long, uploadBytes: Long) {
         val now = System.currentTimeMillis()
-        val elapsed = (now - lastStatsTime).coerceAtLeast(1)
 
         prevDownloadBytes = lastDownloadBytes
         prevUploadBytes = lastUploadBytes
+        prevStatsTime = lastStatsTime
+
         lastDownloadBytes = downloadBytes
         lastUploadBytes = uploadBytes
         lastStatsTime = now
@@ -36,9 +44,14 @@ object TunnelManager {
     fun getStatistics(): Map<String, Any>? {
         if (status != TunnelStatus.connected) return null
 
-        val elapsed = (System.currentTimeMillis() - lastStatsTime).coerceAtLeast(1).toDouble() / 1000.0
-        val dlSpeed = if (elapsed > 0) ((lastDownloadBytes - prevDownloadBytes) / elapsed) else 0.0
-        val ulSpeed = if (elapsed > 0) ((lastUploadBytes - prevUploadBytes) / elapsed) else 0.0
+        val elapsedMs = (lastStatsTime - prevStatsTime).coerceAtLeast(1)
+        val elapsedSec = elapsedMs.toDouble() / 1000.0
+
+        val dlDiff = (lastDownloadBytes - prevDownloadBytes).coerceAtLeast(0)
+        val ulDiff = (lastUploadBytes - prevUploadBytes).coerceAtLeast(0)
+
+        val dlSpeed = if (elapsedSec > 0) (dlDiff / elapsedSec) else 0.0
+        val ulSpeed = if (elapsedSec > 0) (ulDiff / elapsedSec) else 0.0
 
         return mapOf(
             "downloadBytes" to lastDownloadBytes,
@@ -54,6 +67,8 @@ object TunnelManager {
         lastUploadBytes = 0
         prevDownloadBytes = 0
         prevUploadBytes = 0
+        lastStatsTime = System.currentTimeMillis()
+        prevStatsTime = System.currentTimeMillis()
         excludedApps = emptyList()
     }
 }

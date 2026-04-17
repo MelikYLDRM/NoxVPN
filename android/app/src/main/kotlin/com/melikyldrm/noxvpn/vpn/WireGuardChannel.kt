@@ -12,6 +12,7 @@ import com.wireguard.config.Interface
 import com.wireguard.config.Peer
 import com.wireguard.crypto.KeyPair
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -22,14 +23,32 @@ class WireGuardChannel(
 
     companion object {
         private const val CHANNEL_NAME = "com.melikyldrm.noxvpn/vpn"
+        private const val EVENT_CHANNEL_NAME = "com.melikyldrm.noxvpn/vpn_status"
         private const val VPN_REQUEST_CODE = 24601
     }
 
     private val channel = MethodChannel(messenger, CHANNEL_NAME)
+    private val eventChannel = EventChannel(messenger, EVENT_CHANNEL_NAME)
     private var pendingResult: MethodChannel.Result? = null
+    private var eventSink: EventChannel.EventSink? = null
 
     init {
         channel.setMethodCallHandler(this)
+        eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                eventSink = events
+                TunnelManager.statusListener = { status ->
+                    activity.runOnUiThread {
+                        eventSink?.success(status.name)
+                    }
+                }
+            }
+
+            override fun onCancel(arguments: Any?) {
+                eventSink = null
+                TunnelManager.statusListener = null
+            }
+        })
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -72,7 +91,7 @@ class WireGuardChannel(
             val endpoint = call.argument<String>("endpoint") ?: throw IllegalArgumentException("Missing endpoint")
             val allowedIPs = call.argument<String>("allowedIPs") ?: "0.0.0.0/0"
             val presharedKey = call.argument<String>("presharedKey")
-            val persistentKeepalive = call.argument<Int>("persistentKeepalive") ?: 25
+            val persistentKeepalive = call.argument<Int>("persistentKeepalive") ?: 15
             val killSwitch = call.argument<Boolean>("killSwitch") ?: false
             val excludedApps = call.argument<List<String>>("excludedApps") ?: emptyList()
 

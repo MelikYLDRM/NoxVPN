@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import com.melikyldrm.noxvpn.MainActivity
 import com.melikyldrm.noxvpn.R
@@ -25,11 +26,13 @@ class MyVpnService : VpnService() {
         private const val NOTIFICATION_CHANNEL_ID = "noxvpn_vpn_channel"
         private const val NOTIFICATION_ID = 1
         private const val TAG = "MyVpnService"
+        private const val WAKELOCK_TAG = "NoxVPN::VpnWakeLock"
     }
 
     private var backend: GoBackend? = null
     private var tunnel: MyTunnel? = null
     private var statsTimer: Timer? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -43,6 +46,28 @@ class MyVpnService : VpnService() {
             ACTION_DISCONNECT -> disconnect()
         }
         return START_STICKY
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock == null) {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                WAKELOCK_TAG
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
+        wakeLock = null
     }
 
     private fun connect() {
@@ -59,6 +84,8 @@ class MyVpnService : VpnService() {
         startForeground(NOTIFICATION_ID, createNotification(
             if (killSwitch) "Connecting (Kill Switch ON)..." else "Connecting..."
         ))
+
+        acquireWakeLock()
 
         thread {
             try {
@@ -79,6 +106,7 @@ class MyVpnService : VpnService() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to connect: ${e.message}", e)
                 TunnelManager.status = TunnelStatus.error
+                releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -95,13 +123,23 @@ class MyVpnService : VpnService() {
             }
 
             TunnelManager.reset()
+            releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: Exception) {
             Log.e(TAG, "Error disconnecting: ${e.message}", e)
             TunnelManager.reset()
+            releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
+        }
+    }
+
+    private fun formatSpeed(bytesPerSec: Double): String {
+        return when {
+            bytesPerSec >= 1_000_000 -> String.format("%.1f MB/s", bytesPerSec / 1_000_000)
+            bytesPerSec >= 1_000 -> String.format("%.0f KB/s", bytesPerSec / 1_000)
+            else -> String.format("%.0f B/s", bytesPerSec)
         }
     }
 
@@ -115,6 +153,16 @@ class MyVpnService : VpnService() {
                         val stats = backend?.getStatistics(tunnel!!)
                         if (stats != null) {
                             TunnelManager.updateStats(stats.totalRx(), stats.totalTx())
+
+                            // Update notification with speed
+                            val tunnelStats = TunnelManager.getStatistics()
+                            if (tunnelStats != null) {
+                                val dlSpeed = (tunnelStats["downloadSpeedBps"] as? Double) ?: 0.0
+                                val ulSpeed = (tunnelStats["uploadSpeedBps"] as? Double) ?: 0.0
+                                val speedText = "↓ ${formatSpeed(dlSpeed)} | ↑ ${formatSpeed(ulSpeed)}"
+                                val notificationManager = getSystemService(NotificationManager::class.java)
+                                notificationManager.notify(NOTIFICATION_ID, createNotification(speedText))
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -130,7 +178,7 @@ class MyVpnService : VpnService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        disconnect()
+        // VPN stays connected when app is removed from recents
         super.onTaskRemoved(rootIntent)
     }
 

@@ -5,6 +5,7 @@ enum VpnConnectionStatus {
   requestingPermission,
   connecting,
   connected,
+  reconnecting,
   disconnecting,
   error,
 }
@@ -27,7 +28,8 @@ class VpnState {
   bool get isConnected => status == VpnConnectionStatus.connected;
   bool get isConnecting =>
       status == VpnConnectionStatus.connecting ||
-      status == VpnConnectionStatus.requestingPermission;
+      status == VpnConnectionStatus.requestingPermission ||
+      status == VpnConnectionStatus.reconnecting;
   bool get isDisconnecting => status == VpnConnectionStatus.disconnecting;
 
   VpnState copyWith({

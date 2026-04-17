@@ -38,6 +38,8 @@ class _NovaVPNAppState extends ConsumerState<NovaVPNApp> {
   void initState() {
     super.initState();
     _checkAutoConnect();
+    // Initialize periodic ping refresh
+    ref.read(pingRefreshProvider);
   }
 
   Future<void> _checkAutoConnect() async {
@@ -86,9 +88,8 @@ class _NovaVPNAppState extends ConsumerState<NovaVPNApp> {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       home: hasSelected.when(
-        data: (selected) => selected
-            ? const MainShell()
-            : const LanguageSelectionScreen(),
+        data: (selected) =>
+            selected ? const MainShell() : const LanguageSelectionScreen(),
         loading: () => const Scaffold(
           backgroundColor: AppColors.bgBlack,
           body: Center(

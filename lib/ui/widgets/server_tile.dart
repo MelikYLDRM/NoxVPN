@@ -9,13 +9,17 @@ import 'server_avatar.dart';
 class ServerTile extends StatelessWidget {
   final ServerConfig server;
   final bool isSelected;
+  final bool isFavorite;
   final VoidCallback onTap;
+  final VoidCallback? onFavoriteToggle;
 
   const ServerTile({
     super.key,
     required this.server,
     required this.isSelected,
+    this.isFavorite = false,
     required this.onTap,
+    this.onFavoriteToggle,
   });
 
   @override
@@ -53,13 +57,31 @@ class ServerTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l.resolve(server.city), style: theme.textTheme.bodyLarge),
+                    Text(
+                      l.resolve(server.city),
+                      style: theme.textTheme.bodyLarge,
+                    ),
                     const SizedBox(height: 2),
                     Text(server.country, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
               PingBadge(pingMs: server.estimatedPingMs),
+              if (onFavoriteToggle != null) ...[
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: onFavoriteToggle,
+                  child: Icon(
+                    isFavorite
+                        ? Icons.star_rounded
+                        : Icons.star_outline_rounded,
+                    color: isFavorite
+                        ? Colors.amber
+                        : AppColors.textSecondary.withValues(alpha: 0.5),
+                    size: 22,
+                  ),
+                ),
+              ],
               const SizedBox(width: AppSpacing.sm),
               if (isSelected)
                 const Icon(
