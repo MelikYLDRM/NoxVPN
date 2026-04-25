@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,8 +81,12 @@ class WarpService {
   /// Register with Cloudflare WARP and get WireGuard config.
   /// [generateKeyPair] should be a function that generates a WireGuard key pair
   /// using the native platform channel.
+  ///
+  /// Ağ hataları için 3 denemeye kadar exponential backoff uygulanır.
   static Future<WarpRegistration?> register({
     required Future<Map<String, String>> Function() generateKeyPair,
+    int maxAttempts = 3,
+    Duration timeout = const Duration(seconds: 10),
   }) async {
     try {
       // Check if already registered
@@ -94,25 +100,48 @@ class WarpService {
       final privateKey = keyPair['privateKey']!;
       final publicKey = keyPair['publicKey']!;
 
-      // Register with WARP API
-      final response = await http.post(
-        Uri.parse('$_apiBase/reg'),
-        headers: {
-          'Content-Type': 'application/json',
-          'CF-Client-Version': 'a-6.11-2223',
-        },
-        body: jsonEncode({
-          'key': publicKey,
-          'tos': DateTime.now().toUtc().toIso8601String(),
-          'model': 'Android',
-          'type': 'Android',
-          'locale': 'en_US',
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        return null;
+      // Retry mantığı ile WARP API'ye kayıt
+      http.Response? response;
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          response = await http
+              .post(
+                Uri.parse('$_apiBase/reg'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'CF-Client-Version': 'a-6.11-2223',
+                },
+                body: jsonEncode({
+                  'key': publicKey,
+                  'tos': DateTime.now().toUtc().toIso8601String(),
+                  'model': 'Android',
+                  'type': 'Android',
+                  'locale': 'en_US',
+                }),
+              )
+              .timeout(timeout);
+          if (response.statusCode == 200) break;
+          response = null;
+        } on TimeoutException catch (e) {
+          developer.log(
+            'WARP register timeout (attempt ${attempt + 1})',
+            name: 'WarpService',
+            error: e,
+          );
+        } catch (e) {
+          developer.log(
+            'WARP register error (attempt ${attempt + 1})',
+            name: 'WarpService',
+            error: e,
+          );
+        }
+        if (attempt < maxAttempts - 1) {
+          await Future<void>.delayed(
+            Duration(milliseconds: 500 * (1 << attempt)),
+          );
+        }
       }
+      if (response == null) return null;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
@@ -167,7 +196,13 @@ class WarpService {
 
       await _saveRegistration(reg);
       return reg;
-    } catch (e, _) {
+    } catch (e, st) {
+      developer.log(
+        'WARP register failed',
+        name: 'WarpService',
+        error: e,
+        stackTrace: st,
+      );
       return null;
     }
   }
@@ -196,8 +231,8 @@ class WarpService {
       clientAddress: reg.clientIpv4,
       allowedIPs: const ['0.0.0.0/0', '::/0'],
       dnsServers: const ['1.1.1.1', '1.0.0.1'],
-      mtu: 1400,
-      persistentKeepalive: 15,
+      mtu: 1280,
+      persistentKeepalive: 25,
       estimatedPingMs: 15,
     );
   }
@@ -205,12 +240,13 @@ class WarpService {
   /// Generate multiple ServerConfig entries from a single registration
   /// by using different WARP endpoints. Returns immediately with estimated pings.
   /// Actual pings should be measured later via refreshPings().
-  static List<ServerConfig> toMultipleServerConfigs(
-    WarpRegistration reg,
-  ) {
+  static List<ServerConfig> toMultipleServerConfigs(WarpRegistration reg) {
     return WarpEndpoints.endpoints.map((warpEndpoint) {
+      // Hem host hem port'u ID'ye dâhil et: aynı host'un farklı portları
+      // için benzersizlik sağlanır (Dismissible duplicate-key hatasını önler).
+      final safeHost = warpEndpoint.host.replaceAll('.', '_');
       return ServerConfig(
-        id: 'warp-${warpEndpoint.host.replaceAll('.', '_')}',
+        id: 'warp-$safeHost-${warpEndpoint.port}',
         country: 'Cloudflare',
         city: '${warpEndpoint.label} (${warpEndpoint.region})',
         countryCode: 'warp',
@@ -220,8 +256,8 @@ class WarpService {
         clientAddress: reg.clientIpv4,
         allowedIPs: const ['0.0.0.0/0', '::/0'],
         dnsServers: const ['1.1.1.1', '1.0.0.1'],
-        mtu: 1400,
-        persistentKeepalive: 15,
+        mtu: 1280,
+        persistentKeepalive: 25,
         estimatedPingMs: 50,
       );
     }).toList();

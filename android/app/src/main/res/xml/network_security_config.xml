@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for Nox VPN.
+
+    Bu yapılandırma Google Play güvenlik gereksinimlerini karşılar:
+    - Cleartext (HTTP) trafiği tüm domainler için yasaktır.
+    - Sadece sistem CA'ları kabul edilir (kullanıcı CA'ları reddedilir).
+    - Cloudflare API çağrıları HTTPS+TLS 1.2+ üzerinden yapılır.
+
+    NOT: VPN tüneli üzerinden geçen kullanıcı trafiği bu config'ten
+    etkilenmez; bu yalnızca uygulamanın kendi ağ çağrılarını korur.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Debug build'ler için: kullanıcı CA'larına izin ver (ör. Charles Proxy) -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

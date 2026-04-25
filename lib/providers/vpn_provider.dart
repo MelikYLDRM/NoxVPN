@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -140,6 +141,9 @@ class VpnNotifier extends StateNotifier<VpnState> {
             connectedSince: state.connectedSince ?? DateTime.now(),
           );
           _startHealthMonitor(server);
+          // DNS önbelleğini ve WireGuard handshake'ini ısıt — ilk tıklama
+          // gecikmesini önler. Bağlantı UI'ı bloklamasın diye unawaited.
+          unawaited(_warmUpTunnel());
         } else {
           await _retryOrFail(server, '@tunnelFailed');
         }
@@ -205,6 +209,29 @@ class VpnNotifier extends StateNotifier<VpnState> {
   void _stopHealthMonitor() {
     _healthTimer?.cancel();
     _healthTimer = null;
+  }
+
+  /// Tünel kurulduktan sonra paralel olarak birkaç kritik domaini DNS
+  /// üzerinden çözerek WireGuard handshake'ini ve OS DNS önbelleğini
+  /// ısıtır. Böylece kullanıcının ilk tarayıcı tıklaması bekletilmez.
+  Future<void> _warmUpTunnel() async {
+    const domains = [
+      'www.google.com',
+      'www.cloudflare.com',
+      'www.youtube.com',
+      'www.facebook.com',
+    ];
+    try {
+      await Future.wait(
+        domains.map(
+          (d) => InternetAddress.lookup(d)
+              .timeout(const Duration(seconds: 3))
+              .catchError((_) => <InternetAddress>[]),
+        ),
+      );
+    } catch (_) {
+      // Sessizce yut — warm-up best-effort.
+    }
   }
 
   Future<void> disconnect() async {
